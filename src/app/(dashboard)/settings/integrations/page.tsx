@@ -13,6 +13,7 @@ const PLATFORM_LABELS: Record<IntegrationPlatform, string> = {
   stripe: "Stripe (Payments)",
   urable: "Urable (Scheduling)",
   meta_ads: "Meta Ads (Advertising)",
+  quickbooks: "QuickBooks (Financials)",
 };
 
 export default async function IntegrationsSettingsPage() {

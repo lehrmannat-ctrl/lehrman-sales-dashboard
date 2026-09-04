@@ -8,11 +8,20 @@ further code-writing substitutes for these:
 2. **Run `npm install` and `npm run dev` for the first time** — this
    codebase has never been through a real Node/npm install (sandbox had no
    registry access). Fix whatever surfaces.
-3. **Get API credentials** for GoHighLevel, Quo, Stripe, Urable, and Meta
-   Ads, and work through `docs/integration-setup-guide.md` for each —
-   including the parts that need account-specific decisions (GHL pipeline
-   stage names, how Urable jobs will carry an opportunity id, Quo's actual
-   API shape).
+3. **Get API credentials** for GoHighLevel, Quo, Stripe, Urable, Meta Ads,
+   and QuickBooks Online, and work through `docs/integration-setup-guide.md`
+   for each — including the parts that need account-specific decisions (GHL
+   pipeline stage names, how Urable jobs will carry an opportunity id, Quo's
+   actual API shape, QuickBooks's chart-of-accounts-to-P&L-bucket mapping).
+   Also **connect the Slack app** (in Claude's connector settings) — the
+   task-reminder and marketing-audit automations post there and do nothing
+   until it's connected.
+3a. **(Optional, unblocks real ad-level attribution)** Instrument the lead
+   capture form to pass through Meta's `fbclid` (or UTM params) so a lead
+   can be traced back to a specific ad, not just "Facebook/Instagram" as a
+   category — see `docs/marketing-attribution.md` for exactly what this
+   takes. Not required for anything else to work; without it, ad-level
+   revenue attribution stays at the category level.
 4. **Decide the login model**: does every login get created manually by
    Nathaniel, or is there a self-signup flow? (Recommendation: manual,
    given it's a 1-2 person team — simpler and safer.) **Resolved**: logins

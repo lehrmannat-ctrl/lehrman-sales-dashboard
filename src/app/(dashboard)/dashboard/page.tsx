@@ -1,9 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resolveDateRange, previousComparablePeriod, type DateRangePreset } from "@/lib/date-ranges";
-import { getRawKpiInputs, getSpeedToLeadMinutes, getGoals, findGoal } from "@/lib/queries";
+import { getRawKpiInputs, getSpeedToLeadMinutes, getGoals, findGoal, getSimplePnl, type PnlPeriod, type SimplePnl } from "@/lib/queries";
 import { buildKpiResult, contactRate, showRate, closeRate, averageTicket, revenuePerLead, cashPerLead, revenuePerAppointment, cashPerAppointment } from "@/lib/kpi";
 import { KpiCard } from "@/components/KpiCard";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { PnlSection } from "./PnlSection";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +14,20 @@ export default async function ExecutiveDashboardPage({ searchParams }: { searchP
   const prevRange = previousComparablePeriod(preset, range);
 
   const supabase = createSupabaseServerClient();
-  const [current, previous, speedToLeadMin, goals] = await Promise.all([
+  const [current, previous, speedToLeadMin, goals, pnlCurrentMonth, pnlPreviousMonth, pnlYtd] = await Promise.all([
     getRawKpiInputs(supabase, range),
     getRawKpiInputs(supabase, prevRange),
     getSpeedToLeadMinutes(supabase, range),
     getGoals(supabase),
+    getSimplePnl(supabase, "current_month"),
+    getSimplePnl(supabase, "previous_month"),
+    getSimplePnl(supabase, "ytd"),
   ]);
+  const pnlByPeriod: Record<PnlPeriod, SimplePnl | null> = {
+    current_month: pnlCurrentMonth,
+    previous_month: pnlPreviousMonth,
+    ytd: pnlYtd,
+  };
 
   const monthlyRevenueGoal = findGoal(goals, "revenue_sold", "monthly");
   const monthlyCashGoal = findGoal(goals, "cash_collected", "monthly");
@@ -92,6 +101,8 @@ export default async function ExecutiveDashboardPage({ searchParams }: { searchP
       <p className="text-xs text-slate-500">
         Revenue Sold, Cash Collected, Deposits Collected, and Outstanding Balance are tracked separately by design — see the Revenue &amp; Cash page for the full breakdown, including refunds and completed-job revenue.
       </p>
+
+      <PnlSection pnlByPeriod={pnlByPeriod} />
     </div>
   );
 }

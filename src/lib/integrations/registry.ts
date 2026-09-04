@@ -6,6 +6,7 @@ import { quoAdapter } from "./quo";
 import { stripeAdapter } from "./stripe";
 import { urableAdapter } from "./urable";
 import { metaAdsAdapter } from "./meta";
+import { quickbooksAdapter } from "./quickbooks";
 
 export const ADAPTERS: Record<IntegrationPlatform, IntegrationAdapter> = {
   gohighlevel: gohighlevelAdapter,
@@ -13,6 +14,7 @@ export const ADAPTERS: Record<IntegrationPlatform, IntegrationAdapter> = {
   stripe: stripeAdapter,
   urable: urableAdapter,
   meta_ads: metaAdsAdapter,
+  quickbooks: quickbooksAdapter,
 };
 
 /**

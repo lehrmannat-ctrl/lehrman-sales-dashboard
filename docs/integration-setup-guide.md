@@ -83,11 +83,21 @@ surface could not be confirmed without a live account. Before enabling:
 ## Urable (scheduling)
 
 Also unverified against a live account. Before enabling:
-1. Confirm the jobs/appointments API shape.
+1. Confirm the jobs/appointments API shape (see `src/lib/integrations/urable.ts`
+   for every field-name guess that needs checking against a real payload —
+   customer name/phone/email, vehicle, service name, price, address).
 2. Decide how a job record carries the opportunity id it belongs to —
    this scaffold assumes a custom field on the job holds it, which likely
    needs to be configured in Urable and populated when the job is booked
    (ideally pushed there automatically from GoHighLevel at booking time).
+   **This is now optional, not required**: a job with no opportunity id
+   still syncs as a direct Urable booking (migration 0018), using Urable's
+   own customer/service/price fields instead of the CRM's. Its revenue
+   shows as "quoted in Urable," not "collected" (that still only comes from
+   Stripe via an opportunity link).
+3. Urable has no concept of marketing attribution (which ad led to this
+   booking) — see `docs/marketing-attribution.md`. Don't expect it to ever
+   report that; it isn't the right system for it.
 
 ## Meta Ads
 
@@ -96,10 +106,57 @@ Also unverified against a live account. Before enabling:
 2. Confirm the current Graph API version (`GRAPH_API_VERSION` in
    `src/lib/integrations/meta.ts`) is still supported — Meta deprecates
    old versions on a schedule.
-3. `leads_attributed` is intentionally left unset by this adapter — Meta's
-   own lead-attribution can disagree with the CRM's. Backfill it from
-   GoHighLevel's `lead_source_id` counts instead so there's one honest
-   number, not two disagreeing ones.
+3. `leads_attributed` (on the campaign-level `ad_spend` table) is
+   intentionally left unset by this adapter — Meta's own lead-attribution
+   can disagree with the CRM's. Backfill it from GoHighLevel's
+   `lead_source_id` counts instead so there's one honest number, not two
+   disagreeing ones.
+4. As of this version, the adapter also syncs ad-set/ad-level detail into
+   `ad_performance_daily` (impressions, reach, frequency, link clicks,
+   CPM/CTR/CPC computed from those, and Meta's own lead count per ad) — this
+   is what the daily/weekly/monthly marketing-audit automations read.
+   `meta_leads` on that table is Meta's own count, kept separate from the
+   CRM's — see `docs/marketing-attribution.md` for why the two aren't
+   blended into one number.
+
+## QuickBooks Online (the simple P&L section)
+
+This is a DIFFERENT thing from the "Intuit QuickBooks" connector available
+inside a Claude conversation — that connector is useful for asking Claude
+ad-hoc financial questions in chat, but it cannot be used by this app's own
+always-on Vercel-hosted sync, which needs its own OAuth app credentials.
+
+1. Go to [developer.intuit.com](https://developer.intuit.com), sign in with
+   the QuickBooks Online login, and create an app (Development → Create an
+   app → QuickBooks Online and Payments).
+2. Under that app's "Keys & OAuth", copy the **Client ID** and **Client
+   Secret** (use the Production keys once ready to go live — Development
+   keys only work against a sandbox company). Set `QUICKBOOKS_CLIENT_ID` and
+   `QUICKBOOKS_CLIENT_SECRET`.
+3. Get a refresh token and the company's realm ID: the easiest path is
+   Intuit's [OAuth 2.0 Playground](https://developer.intuit.com/app/developer/playground) —
+   connect it to the real company, authorize, and it hands back both the
+   `realmId` (set as `QUICKBOOKS_REALM_ID`) and a `refresh_token` (set as
+   `QUICKBOOKS_REFRESH_TOKEN`).
+4. Leave `QUICKBOOKS_ENVIRONMENT` unset (defaults to production) once
+   pointed at the real company; set it to `sandbox` only while testing
+   against Intuit's sandbox company.
+5. **Known limitation to watch for**: QuickBooks refresh tokens expire after
+   ~100 days of the integration going unused, and rotate on every use. This
+   adapter does not yet persist the rotated token anywhere (see the
+   TODO in `src/lib/integrations/quickbooks.ts`) — if syncing ever starts
+   failing with an auth error after a long quiet period, generate a fresh
+   refresh token via the OAuth Playground and update the env var.
+6. **Required for the numbers to land in the right buckets**: the adapter
+   sorts QuickBooks Online's chart-of-accounts line items into Supplies /
+   Labor / Marketing / Rent / Other by keyword-matching the account name
+   (see `bucketExpenseLine()`). If an expense account is named something
+   the keyword list won't catch (check the function before assuming), it
+   falls into "Other" — either rename the account in QuickBooks to include
+   an obvious keyword, or extend the keyword list in that function.
+7. Test: Resync now on `/settings/integrations`, then check the P&L section
+   on the Owner Dashboard shows non-zero numbers matching what QuickBooks
+   itself reports for the current month.
 
 ## Running the scheduled sync
 

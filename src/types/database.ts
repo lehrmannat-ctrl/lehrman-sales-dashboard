@@ -92,6 +92,8 @@ export interface Lead {
   email: string | null;
   lead_source_id: string | null;
   attribution_missing: boolean;
+  /** Meta ad_id this lead is attributed to, when known. Null for almost all leads until the intake form passes through fbclid/UTM — see docs/marketing-attribution.md. */
+  attributed_ad_id: string | null;
   assigned_to: string | null;
   stage: PipelineStage;
   temperature: LeadTemperature;
@@ -187,10 +189,19 @@ export type JobStatus = "scheduled" | "in_progress" | "completed" | "canceled";
 
 export interface Job {
   id: string;
-  opportunity_id: string;
+  /** Null means this job has no linked CRM opportunity -- a customer who booked directly through Urable rather than coming through the lead pipeline. */
+  opportunity_id: string | null;
   scheduled_at: string | null;
   completed_at: string | null;
   status: JobStatus;
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
+  vehicle: string | null;
+  service_name: string | null;
+  /** Urable's own quoted/booked price. NOT the revenue system of record -- see payments (Stripe) via opportunity_id wherever that link exists. */
+  quoted_amount_cents: number | null;
+  service_address: string | null;
 }
 
 export interface Goal {
@@ -231,7 +242,7 @@ export interface Alert {
   created_at: string;
 }
 
-export type IntegrationPlatform = "gohighlevel" | "quo" | "stripe" | "urable" | "meta_ads";
+export type IntegrationPlatform = "gohighlevel" | "quo" | "stripe" | "urable" | "meta_ads" | "quickbooks";
 export type IntegrationStatus = "not_connected" | "connected" | "error";
 
 export interface IntegrationRow {
@@ -243,6 +254,27 @@ export interface IntegrationRow {
   last_error: string | null;
   records_synced_total: number;
   config: Record<string, unknown>;
+}
+
+// --- Simple P&L (QuickBooks-sourced; see supabase/migrations/0016_quickbooks_financial_snapshots.sql) ---
+
+export type FinancialPeriodType = "month" | "ytd";
+
+export interface FinancialSnapshotRow {
+  id: string;
+  source_platform: string;
+  period_type: FinancialPeriodType;
+  period_label: string;
+  period_start: string;
+  period_end: string;
+  revenue_cents: number;
+  supplies_cents: number;
+  labor_cents: number;
+  marketing_cents: number;
+  rent_cents: number;
+  other_cents: number;
+  synced_at: string;
+  created_at: string;
 }
 
 // --- Views (daily-grain reporting facts; see supabase/migrations/0004_views.sql) ---

@@ -4,11 +4,11 @@ import { useMemo, useState, useTransition, type ChangeEvent } from "react";
 import type { TaskPickerLead } from "@/lib/queries";
 import { createManualFollowUpTask } from "./actions";
 
-/** Default due time for a newly-added task: tomorrow at 9am, in the browser's local time. */
+/** Default due time for a newly-added task: tomorrow at 11:30am, in the browser's local time (matches the morning cadence default — see followup-engine.ts). */
 function defaultDueValue(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  d.setHours(9, 0, 0, 0);
+  d.setHours(11, 30, 0, 0);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

@@ -4,6 +4,8 @@ import type { TaskDueRange } from "./task-due-filters";
 import { closeRate } from "./kpi";
 import type {
   Alert,
+  FinancialPeriodType,
+  FinancialSnapshotRow,
   FollowUpStatus,
   FollowUpTask,
   FunnelSummaryRow,
@@ -802,4 +804,71 @@ export async function getLeadsForTaskPicker(supabase: SupabaseClient): Promise<T
     name: `${l.first_name ?? ""} ${l.last_name ?? ""}`.trim() || "Unnamed lead",
     phone: l.phone ?? null,
   }));
+}
+
+// --- Simple P&L (QuickBooks-sourced financial_snapshots — see migration 0016) ---
+
+export type PnlPeriod = "current_month" | "previous_month" | "ytd";
+
+export interface SimplePnl {
+  revenueCents: number;
+  suppliesCents: number;
+  laborCents: number;
+  marketingCents: number;
+  rentCents: number;
+  otherCents: number;
+  totalExpensesCents: number;
+  profitCents: number;
+  /** null when revenue is 0 — dividing by zero isn't a meaningful margin. */
+  profitMarginPct: number | null;
+  syncedAt: string | null;
+}
+
+/** Must exactly match the period_label scheme quickbooks.ts's sync() writes, or lookups will silently miss. */
+function pnlPeriodLabel(period: PnlPeriod, now: Date): { periodType: FinancialPeriodType; periodLabel: string } {
+  if (period === "ytd") return { periodType: "ytd", periodLabel: `${now.getUTCFullYear()}` };
+  const monthDate =
+    period === "current_month"
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return {
+    periodType: "month",
+    periodLabel: `${monthDate.getUTCFullYear()}-${String(monthDate.getUTCMonth() + 1).padStart(2, "0")}`,
+  };
+}
+
+function toSimplePnl(row: FinancialSnapshotRow | null): SimplePnl | null {
+  if (!row) return null;
+  const totalExpensesCents = row.supplies_cents + row.labor_cents + row.marketing_cents + row.rent_cents + row.other_cents;
+  const profitCents = row.revenue_cents - totalExpensesCents;
+  return {
+    revenueCents: row.revenue_cents,
+    suppliesCents: row.supplies_cents,
+    laborCents: row.labor_cents,
+    marketingCents: row.marketing_cents,
+    rentCents: row.rent_cents,
+    otherCents: row.other_cents,
+    totalExpensesCents,
+    profitCents,
+    profitMarginPct: row.revenue_cents > 0 ? (profitCents / row.revenue_cents) * 100 : null,
+    syncedAt: row.synced_at,
+  };
+}
+
+/** Returns null (not a zeroed-out P&L) when QuickBooks hasn't synced this period yet — the UI must tell the owner "not synced," never silently show $0. */
+export async function getSimplePnl(
+  supabase: SupabaseClient,
+  period: PnlPeriod,
+  now: Date = new Date()
+): Promise<SimplePnl | null> {
+  const { periodType, periodLabel } = pnlPeriodLabel(period, now);
+  const { data, error } = await supabase
+    .from("financial_snapshots")
+    .select("*")
+    .eq("source_platform", "quickbooks")
+    .eq("period_type", periodType)
+    .eq("period_label", periodLabel)
+    .maybeSingle();
+  if (error) throw error;
+  return toSimplePnl((data as FinancialSnapshotRow | null) ?? null);
 }
