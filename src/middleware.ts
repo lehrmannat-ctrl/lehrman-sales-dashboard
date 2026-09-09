@@ -34,7 +34,13 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-  const isPublicApi = request.nextUrl.pathname.startsWith("/api/webhooks");
+  const isPublicApi =
+    request.nextUrl.pathname.startsWith("/api/webhooks") ||
+    // /api/cron routes carry their own CRON_SECRET check (see route.ts) --
+    // this bypass only skips the *session* redirect so Vercel Cron (and a
+    // manual trigger) can reach that check at all instead of being bounced
+    // to /login first, which is what was happening before this fix.
+    request.nextUrl.pathname.startsWith("/api/cron");
 
   if (!user && !isLoginPage && !isPublicApi) {
     const redirectUrl = new URL("/login", request.url);
